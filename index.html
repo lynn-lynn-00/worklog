@@ -342,20 +342,21 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--bg)
 </div>
 
 <script>
-// ── Config ──────────────────────────────────────────
-const CLIENT_ID = '15824433375-qfqhl4cs7t92fcvtrm340gr16atksc9b.apps.googleusercontent.com'; // 已更新為您的 Client ID
+// ── Config ──
+// 這裡已填入你提供的 Client ID
+const CLIENT_ID = '115824433375-qfqhl4cs7t92fcvtrm340gr16atksc9b.apps.googleusercontent.com'; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
 const FILENAME = 'worklog-data.json';
 const COLORS = ['#2563eb','#059669','#dc2626','#d97706','#7c3aed','#db2777','#0891b2','#65a30d','#ea580c','#4f46e5'];
 
-// ── State ────────────────────────────────────────────
+// ── State ──
 let state = {
   tags: [
     { name: '開發', color: '#2563eb', ended: false },
     { name: '會議', color: '#059669', ended: false },
     { name: '設計', color: '#7c3aed', ended: false },
   ],
-  entries: {}   // { 'YYYY-MM-DD': { 'H:MM': 'tagName', ... } }
+  entries: {}
 };
 let activeTag = state.tags[0];
 let currentDate = new Date();
@@ -369,7 +370,7 @@ let isGoogleUser = false;
 let googleAccessToken = null;
 let driveFileId = null;
 
-// ── Date helpers ──────────────────────────────────────
+// ── Date helpers ──
 const dateKey = d => d.toISOString().slice(0,10);
 const fmt = d => d.toLocaleDateString('zh-TW', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
 function weekDates(d) {
@@ -387,7 +388,7 @@ function rangeDates(start, end) {
   return dates;
 }
 
-// ── Google Drive save/load ────────────────────────────
+// ── Google Drive save/load ──
 async function gDriveLoad() {
   try {
     const list = await fetch(
@@ -440,9 +441,9 @@ function setSaveStatus(txt, syncing=false) {
   if (!syncing) setTimeout(()=>{ if(el.textContent===txt) el.textContent=''; }, 3000);
 }
 
-// ── Auth ──────────────────────────────────────────────
+// ── Auth ──
 document.getElementById('googleLoginBtn').addEventListener('click', () => {
-  if (!window.google) { alert('Google SDK 尚未載入，請稍後再試或使用試用模式'); return; }
+  if (!window.google) { alert('Google SDK 尚未載入，請稍後再試'); return; }
   const client = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
@@ -483,7 +484,7 @@ function initApp(name, initial) {
   activeTag = state.tags.find(t=>!t.ended) || state.tags[0] || null;
 }
 
-// ── Grid ──────────────────────────────────────────────
+// ── Grid ──
 function renderGrid() {
   document.getElementById('dateLabel').textContent = fmt(currentDate);
   const grid = document.getElementById('timeGrid');
@@ -533,12 +534,12 @@ function applySlot(k, sk, tagName) {
   renderChart();
 }
 
-// ── Navigation ────────────────────────────────────────
+// ── Navigation ──
 document.getElementById('prevDay').addEventListener('click', ()=>{ currentDate.setDate(currentDate.getDate()-1); renderGrid(); renderChart(); });
 document.getElementById('nextDay').addEventListener('click', ()=>{ currentDate.setDate(currentDate.getDate()+1); renderGrid(); renderChart(); });
 document.getElementById('todayBtn').addEventListener('click', ()=>{ currentDate=new Date(); renderGrid(); renderChart(); });
 
-// ── Tags ──────────────────────────────────────────────
+// ── Tags ──
 function renderTags() {
   const container = document.getElementById('tagListContainer');
   container.innerHTML = '';
@@ -589,7 +590,7 @@ function updateActiveTagBar() {
   document.getElementById('activeTagName').textContent = activeTag?.name||'請先選擇 tag';
 }
 
-// ── Color Picker ──────────────────────────────────────
+// ── Color Picker ──
 function renderColorPicker() {
   const cp = document.getElementById('colorPicker'); cp.innerHTML='';
   COLORS.forEach(c => {
@@ -611,7 +612,7 @@ document.getElementById('addTagBtn').addEventListener('click', ()=>{
   scheduleSave(); renderTags(); renderGrid();
 });
 
-// ── Stats ─────────────────────────────────────────────
+// ── Stats ──
 function getKeys() {
   if (viewPeriod==='day') return [dateKey(currentDate)];
   if (viewPeriod==='week') return weekDates(currentDate);
@@ -674,7 +675,7 @@ function renderChart() {
   });
 }
 
-// ── Period buttons ────────────────────────────────────
+// ── Period buttons ──
 document.querySelectorAll('.period-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     viewPeriod = btn.dataset.period;
@@ -692,7 +693,7 @@ document.getElementById('applyRange').addEventListener('click', ()=>{
   renderChart();
 });
 
-// ── Tabs ──────────────────────────────────────────────
+// ── Tabs ──
 document.querySelectorAll('.tab').forEach(tab=>{
   tab.addEventListener('click', ()=>{
     document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -703,7 +704,7 @@ document.querySelectorAll('.tab').forEach(tab=>{
   });
 });
 
-// ── Init ──────────────────────────────────────────────
+// ── Init ──
 function renderAll() {
   renderTags();
   renderColorPicker();
@@ -711,7 +712,6 @@ function renderAll() {
   renderChart();
 }
 
-// Set today's date in custom range inputs
 const today = new Date().toISOString().slice(0,10);
 document.getElementById('rangeStart').value = today;
 document.getElementById('rangeEnd').value = today;
