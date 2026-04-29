@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WorkLog — 工時追蹤</title>
+
+https://accounts.google.com/gsi/client
+https://apis.google.com/js/api.js
+https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js
+
+<style>
+/* （⚠️ 樣式完全沒改，和你原本一樣） */
+:root {
+  --bg:#f7f6f3;--surface:#fff;--surface2:#f0efe9;
+  --border:rgba(0,0,0,.08);--border2:rgba(0,0,0,.14);
+  --text:#1a1916;--text2:#6b6a65;--text3:#a09f99;
+  --accent:#2563eb;--radius:10px;--radius-sm:6px;
+}
+@media (prefers-color-scheme: dark){
+:root{--bg:#18181b;--surface:#242428;--surface2:#2e2e33;
+--border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);
+--text:#f0efe9;--text2:#a09f99;--text3:#6b6a65;}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text)}
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh}
+.login-box{background:var(--surface);padding:48px;border-radius:16px;max-width:400px;width:100%;text-align:center}
+.google-btn{width:100%;padding:12px;border-radius:10px;border:1px solid var(--border2);cursor:pointer}
+</style>
+</head>
+
+<body>
+
+<div id="loginScreen">
+  <div class="login-box">
+    <h1>⏱ WorkLog</h1>
+    <p>使用 Google 帳號登入</p>
+    <button class="google-btn" id="googleLoginBtn">Google 登入</button>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <h2>登入成功 ✅</h2>
+  <p id="userName"></p>
+  <button id="logoutBtn">登出</button>
+</div>
+
+<script>
+/* ✅ 已幫你填好 Client ID */
+const CLIENT_ID = '115824433375-qfqhl4cs7t92fcvtrm340gr16atksc9b.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
+
+let googleAccessToken = null;
+
+document.getElementById('googleLoginBtn').addEventListener('click', () => {
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: async (resp) => {
+      if (resp.error) return;
+      googleAccessToken = resp.access_token;
+
+      const info = await fetch(
+        'https://www.googleapis.com/oauth2/v3/userinfo',
+        { headers:{ Authorization:'Bearer '+googleAccessToken } }
+      ).then(r=>r.json());
+
+      document.getElementById('loginScreen').style.display='none';
+      document.getElementById('app').style.display='block';
+      document.getElementById('userName').textContent =
+        `你好，${info.name}（${info.email}）`;
+    }
+  });
+  client.requestAccessToken();
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  google.accounts.oauth2.revoke(googleAccessToken);
+  location.reload();
+});
+</script>
+
+</body>
+</html>
