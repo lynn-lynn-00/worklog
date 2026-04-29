@@ -1,85 +1,720 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WorkLog — 工時追蹤</title>
-
-https://accounts.google.com/gsi/client
-https://apis.google.com/js/api.js
-https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js
-
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
-/* （⚠️ 樣式完全沒改，和你原本一樣） */
 :root {
-  --bg:#f7f6f3;--surface:#fff;--surface2:#f0efe9;
-  --border:rgba(0,0,0,.08);--border2:rgba(0,0,0,.14);
-  --text:#1a1916;--text2:#6b6a65;--text3:#a09f99;
-  --accent:#2563eb;--radius:10px;--radius-sm:6px;
+  --bg: #f7f6f3;
+  --surface: #ffffff;
+  --surface2: #f0efe9;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.14);
+  --text: #1a1916;
+  --text2: #6b6a65;
+  --text3: #a09f99;
+  --accent: #2563eb;
+  --radius: 10px;
+  --radius-sm: 6px;
 }
-@media (prefers-color-scheme: dark){
-:root{--bg:#18181b;--surface:#242428;--surface2:#2e2e33;
---border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);
---text:#f0efe9;--text2:#a09f99;--text3:#6b6a65;}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #18181b;
+    --surface: #242428;
+    --surface2: #2e2e33;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0efe9;
+    --text2: #a09f99;
+    --text3: #6b6a65;
+  }
 }
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text)}
-#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh}
-.login-box{background:var(--surface);padding:48px;border-radius:16px;max-width:400px;width:100%;text-align:center}
-.google-btn{width:100%;padding:12px;border-radius:10px;border:1px solid var(--border2);cursor:pointer}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ── Login Screen ── */
+#loginScreen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 100vh; gap: 24px; padding: 24px;
+}
+.login-box {
+  background: var(--surface); border: 0.5px solid var(--border2);
+  border-radius: 16px; padding: 48px 40px; max-width: 400px; width: 100%; text-align: center;
+}
+.login-logo { font-size: 36px; margin-bottom: 12px; }
+.login-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+.login-sub { font-size: 14px; color: var(--text2); margin-bottom: 32px; line-height: 1.6; }
+.google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--surface); border: 0.5px solid var(--border2);
+  border-radius: var(--radius); padding: 12px 24px; cursor: pointer;
+  font-size: 14px; font-weight: 500; color: var(--text); width: 100%;
+  transition: background .15s;
+}
+.google-btn:hover { background: var(--surface2); }
+.google-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+.demo-btn {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius); padding: 12px 24px; cursor: pointer;
+  font-size: 14px; font-weight: 500; width: 100%; margin-top: 10px;
+  transition: opacity .15s;
+}
+.demo-btn:hover { opacity: .88; }
+.login-note { font-size: 12px; color: var(--text3); margin-top: 8px; }
+
+/* ── App Layout ── */
+#app { display: none; }
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--surface); border-bottom: 0.5px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; height: 54px; gap: 16px;
+}
+.topbar-title { font-size: 15px; font-weight: 600; flex: 1; }
+.user-pill {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text2); cursor: pointer;
+}
+.user-avatar {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 11px; font-weight: 600;
+}
+.logout-btn {
+  font-size: 12px; color: var(--text3); background: none; border: none;
+  cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm);
+}
+.logout-btn:hover { background: var(--surface2); color: var(--text2); }
+.save-status { font-size: 11px; color: var(--text3); }
+
+.main { display: grid; grid-template-columns: 1fr 340px; gap: 0; height: calc(100vh - 54px); }
+
+/* ── Left: Time Grid ── */
+.left-panel { padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.date-nav { display: flex; align-items: center; gap: 8px; }
+.nav-btn {
+  width: 30px; height: 30px; border: 0.5px solid var(--border2); border-radius: var(--radius-sm);
+  background: none; cursor: pointer; font-size: 16px; color: var(--text2);
+  display: flex; align-items: center; justify-content: center;
+}
+.nav-btn:hover { background: var(--surface2); }
+.date-label { font-size: 15px; font-weight: 600; flex: 1; text-align: center; }
+.today-btn {
+  font-size: 11px; padding: 3px 10px; border: 0.5px solid var(--border2);
+  border-radius: 20px; background: none; cursor: pointer; color: var(--text2);
+}
+.today-btn:hover { background: var(--surface2); }
+
+.active-tag-bar {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface2); border-radius: var(--radius-sm); padding: 8px 12px;
+  font-size: 13px; color: var(--text2);
+}
+.active-tag-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.active-tag-name { font-weight: 500; color: var(--text); flex: 1; }
+.hint-text { font-size: 11px; color: var(--text3); }
+
+.time-grid { display: flex; flex-direction: column; gap: 2px; }
+.hour-group {}
+.hour-row { display: grid; grid-template-columns: 42px 1fr 1fr; gap: 3px; margin-bottom: 2px; align-items: center; }
+.hour-label { font-size: 11px; color: var(--text3); text-align: right; padding-right: 8px; }
+.slot {
+  height: 24px; border-radius: 5px; background: var(--surface2);
+  border: 0.5px solid var(--border); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 500; color: transparent;
+  overflow: hidden; white-space: nowrap; transition: opacity .1s;
+  user-select: none;
+}
+.slot.filled { color: rgba(255,255,255,.9); }
+.slot.filled:hover { opacity: .8; }
+.slot:not(.filled):hover { border-color: var(--border2); background: var(--surface); }
+
+/* ── Right Panel ── */
+.right-panel {
+  border-left: 0.5px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.tabs { display: flex; border-bottom: 0.5px solid var(--border); }
+.tab {
+  flex: 1; padding: 10px; font-size: 13px; font-weight: 500; text-align: center;
+  cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent;
+  transition: all .15s;
+}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { flex: 1; overflow-y: auto; padding: 14px; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* ── Tags Tab ── */
+.tag-group-label {
+  font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text3); margin: 12px 0 6px;
+}
+.tag-group-label:first-child { margin-top: 0; }
+.tag-list { display: flex; flex-direction: column; gap: 4px; }
+.tag-row {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  border-radius: var(--radius-sm); cursor: pointer; transition: background .1s;
+  border: 1.5px solid transparent;
+}
+.tag-row:hover { background: var(--surface2); }
+.tag-row.selected { background: var(--surface2); border-color: var(--border2); }
+.tag-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.tag-name { font-size: 13px; flex: 1; }
+.tag-status {
+  font-size: 10px; padding: 1px 7px; border-radius: 20px;
+  background: var(--surface2); color: var(--text3);
+}
+.tag-status.ended { background: #f5f0e8; color: #9b7c3a; }
+@media (prefers-color-scheme: dark) {
+  .tag-status.ended { background: #2e2a1e; color: #c9a85a; }
+}
+.tag-actions { display: flex; gap: 4px; opacity: 0; transition: opacity .1s; }
+.tag-row:hover .tag-actions { opacity: 1; }
+.tag-action-btn {
+  font-size: 11px; padding: 2px 7px; border: 0.5px solid var(--border2);
+  border-radius: 4px; background: none; cursor: pointer; color: var(--text2);
+}
+.tag-action-btn:hover { background: var(--surface); }
+
+.new-tag-form {
+  margin-top: 12px; padding-top: 12px; border-top: 0.5px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.form-label { font-size: 11px; color: var(--text2); margin-bottom: 2px; }
+.form-input {
+  width: 100%; padding: 7px 10px; border: 0.5px solid var(--border2);
+  border-radius: var(--radius-sm); background: var(--surface); color: var(--text);
+  font-size: 13px;
+}
+.color-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.c-dot {
+  width: 20px; height: 20px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; transition: transform .1s;
+}
+.c-dot:hover { transform: scale(1.15); }
+.c-dot.picked { border-color: var(--text); }
+.add-tag-btn {
+  padding: 7px; border: 0.5px solid var(--border2); border-radius: var(--radius-sm);
+  background: none; cursor: pointer; font-size: 13px; color: var(--text);
+  font-weight: 500; transition: background .1s;
+}
+.add-tag-btn:hover { background: var(--surface2); }
+
+/* ── Stats Tab ── */
+.period-btns { display: flex; gap: 5px; margin-bottom: 12px; flex-wrap: wrap; }
+.period-btn {
+  padding: 5px 12px; border: 0.5px solid var(--border2); border-radius: 20px;
+  background: none; cursor: pointer; font-size: 12px; color: var(--text2);
+  transition: all .12s;
+}
+.period-btn.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.custom-range { display: flex; gap: 6px; margin-bottom: 12px; align-items: center; }
+.custom-range input[type=date] {
+  flex: 1; padding: 5px 8px; border: 0.5px solid var(--border2);
+  border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 12px;
+}
+.custom-range span { font-size: 12px; color: var(--text3); }
+.apply-btn {
+  padding: 5px 12px; background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; font-weight: 500;
+}
+
+.stat-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.stat-card {
+  background: var(--surface2); border-radius: var(--radius-sm); padding: 10px 12px; text-align: center;
+}
+.stat-val { font-size: 20px; font-weight: 600; color: var(--text); }
+.stat-lbl { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+.chart-container { position: relative; width: 200px; height: 200px; margin: 0 auto 14px; }
+.no-data-msg { text-align: center; font-size: 13px; color: var(--text3); padding: 32px 0; }
+
+.legend { display: flex; flex-direction: column; gap: 6px; }
+.leg-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.leg-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.leg-name { flex: 1; color: var(--text2); }
+.leg-val { font-weight: 500; color: var(--text); }
+.leg-pct { font-size: 11px; color: var(--text3); }
+
+/* sync indicator */
+.syncing { animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 </style>
 </head>
-
 <body>
 
 <div id="loginScreen">
   <div class="login-box">
-    <h1>⏱ WorkLog</h1>
-    <p>使用 Google 帳號登入</p>
-    <button class="google-btn" id="googleLoginBtn">Google 登入</button>
+    <div class="login-logo">⏱</div>
+    <h1 class="login-title">WorkLog</h1>
+    <p class="login-sub">以半小時為單位記錄工時<br>透過 Google 帳號安全儲存你的資料</p>
+    <button class="google-btn" id="googleLoginBtn">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      使用 Google 帳號登入
+    </button>
+    <button class="demo-btn" id="demoBtn">試用示範模式（本機儲存）</button>
+    <p class="login-note">Google 登入後資料將儲存於你的 Google Drive 私人資料夾</p>
   </div>
 </div>
 
-<div id="app" style="display:none;">
-  <h2>登入成功 ✅</h2>
-  <p id="userName"></p>
-  <button id="logoutBtn">登出</button>
+<div id="app">
+  <div class="topbar">
+    <span class="topbar-title">⏱ WorkLog</span>
+    <span class="save-status" id="saveStatus"></span>
+    <div class="user-pill">
+      <div class="user-avatar" id="userAvatar">?</div>
+      <span id="userName"></span>
+    </div>
+    <button class="logout-btn" id="logoutBtn">登出</button>
+  </div>
+
+  <div class="main">
+    <div class="left-panel">
+      <div class="date-nav">
+        <button class="nav-btn" id="prevDay">‹</button>
+        <button class="today-btn" id="todayBtn">今天</button>
+        <span class="date-label" id="dateLabel"></span>
+        <button class="nav-btn" id="nextDay">›</button>
+      </div>
+
+      <div class="active-tag-bar">
+        <div class="active-tag-swatch" id="activeTagSwatch"></div>
+        <span class="active-tag-name" id="activeTagName">請先選擇 tag</span>
+        <span class="hint-text">點選或拖曳填入時段</span>
+      </div>
+
+      <div class="time-grid" id="timeGrid"></div>
+    </div>
+
+    <div class="right-panel">
+      <div class="tabs">
+        <div class="tab active" data-tab="tags">Tag 管理</div>
+        <div class="tab" data-tab="stats">統計圖表</div>
+      </div>
+      <div class="tab-content">
+        <div class="tab-pane active" id="pane-tags">
+          <div id="tagListContainer"></div>
+          <div class="new-tag-form">
+            <div>
+              <div class="form-label">新 Tag 名稱</div>
+              <input class="form-input" id="newTagName" placeholder="專案名稱..." maxlength="20">
+            </div>
+            <div>
+              <div class="form-label">顏色</div>
+              <div class="color-row" id="colorPicker"></div>
+            </div>
+            <button class="add-tag-btn" id="addTagBtn">＋ 新增 Tag</button>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="pane-stats">
+          <div class="period-btns">
+            <button class="period-btn on" data-period="day">今日</button>
+            <button class="period-btn" data-period="week">本週</button>
+            <button class="period-btn" data-period="month">本月</button>
+            <button class="period-btn" data-period="custom">自訂</button>
+          </div>
+          <div class="custom-range" id="customRange" style="display:none">
+            <input type="date" id="rangeStart">
+            <span>→</span>
+            <input type="date" id="rangeEnd">
+            <button class="apply-btn" id="applyRange">套用</button>
+          </div>
+          <div class="stat-cards" id="statCards"></div>
+          <div class="chart-container">
+            <canvas id="pieChart" width="200" height="200" role="img" aria-label="工時分配圓形圖">各 tag 工時佔比圓形圖</canvas>
+          </div>
+          <div class="legend" id="legend"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-/* ✅ 已幫你填好 Client ID */
-const CLIENT_ID = '115824433375-qfqhl4cs7t92fcvtrm340gr16atksc9b.apps.googleusercontent.com';
+// ── Config ──────────────────────────────────────────
+const CLIENT_ID = '15824433375-qfqhl4cs7t92fcvtrm340gr16atksc9b.apps.googleusercontent.com'; // 已更新為您的 Client ID
 const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
+const FILENAME = 'worklog-data.json';
+const COLORS = ['#2563eb','#059669','#dc2626','#d97706','#7c3aed','#db2777','#0891b2','#65a30d','#ea580c','#4f46e5'];
 
+// ── State ────────────────────────────────────────────
+let state = {
+  tags: [
+    { name: '開發', color: '#2563eb', ended: false },
+    { name: '會議', color: '#059669', ended: false },
+    { name: '設計', color: '#7c3aed', ended: false },
+  ],
+  entries: {}   // { 'YYYY-MM-DD': { 'H:MM': 'tagName', ... } }
+};
+let activeTag = state.tags[0];
+let currentDate = new Date();
+let viewPeriod = 'day';
+let customStart = null, customEnd = null;
+let isDragging = false, dragFill = null;
+let pieChartInst = null;
+let pickedColor = COLORS[0];
+let saveTimeout = null;
+let isGoogleUser = false;
 let googleAccessToken = null;
+let driveFileId = null;
 
+// ── Date helpers ──────────────────────────────────────
+const dateKey = d => d.toISOString().slice(0,10);
+const fmt = d => d.toLocaleDateString('zh-TW', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+function weekDates(d) {
+  const day = d.getDay(), diff = d.getDate() - day + (day===0?-6:1);
+  const m = new Date(d); m.setDate(diff);
+  return Array.from({length:7},(_,i)=>{ const x=new Date(m); x.setDate(m.getDate()+i); return dateKey(x); });
+}
+function monthDates(d) {
+  const y=d.getFullYear(),mo=d.getMonth();
+  return Array.from({length:new Date(y,mo+1,0).getDate()},(_,i)=>dateKey(new Date(y,mo,i+1)));
+}
+function rangeDates(start, end) {
+  const dates=[]; const cur=new Date(start);
+  while(cur<=end){ dates.push(dateKey(new Date(cur))); cur.setDate(cur.getDate()+1); }
+  return dates;
+}
+
+// ── Google Drive save/load ────────────────────────────
+async function gDriveLoad() {
+  try {
+    const list = await fetch(
+      'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name="'+FILENAME+'"',
+      { headers: { Authorization: 'Bearer '+googleAccessToken } }
+    ).then(r=>r.json());
+    if (list.files && list.files.length > 0) {
+      driveFileId = list.files[0].id;
+      const data = await fetch(
+        'https://www.googleapis.com/drive/v3/files/'+driveFileId+'?alt=media',
+        { headers: { Authorization: 'Bearer '+googleAccessToken } }
+      ).then(r=>r.json());
+      state = data;
+      if (!state.tags) state.tags = [];
+      if (!state.entries) state.entries = {};
+    }
+  } catch(e) { console.warn('Drive load failed', e); }
+}
+
+async function gDriveSave() {
+  if (!isGoogleUser || !googleAccessToken) { localSave(); return; }
+  setSaveStatus('儲存中...', true);
+  try {
+    const body = JSON.stringify(state);
+    if (driveFileId) {
+      await fetch('https://www.googleapis.com/upload/drive/v3/files/'+driveFileId+'?uploadType=media',
+        { method:'PATCH', headers:{ Authorization:'Bearer '+googleAccessToken, 'Content-Type':'application/json' }, body });
+    } else {
+      const meta = await fetch('https://www.googleapis.com/drive/v3/files',
+        { method:'POST', headers:{ Authorization:'Bearer '+googleAccessToken, 'Content-Type':'application/json' },
+          body: JSON.stringify({ name:FILENAME, parents:['appDataFolder'] }) }).then(r=>r.json());
+      driveFileId = meta.id;
+      await fetch('https://www.googleapis.com/upload/drive/v3/files/'+driveFileId+'?uploadType=media',
+        { method:'PATCH', headers:{ Authorization:'Bearer '+googleAccessToken, 'Content-Type':'application/json' }, body });
+    }
+    setSaveStatus('已同步 ✓');
+  } catch(e) { setSaveStatus('同步失敗'); localSave(); }
+}
+
+function localSave() { localStorage.setItem('worklog_state', JSON.stringify(state)); setSaveStatus('已儲存 ✓'); }
+function scheduleSave() {
+  clearTimeout(saveTimeout);
+  setSaveStatus('待儲存...'); 
+  saveTimeout = setTimeout(isGoogleUser ? gDriveSave : localSave, 1200);
+}
+function setSaveStatus(txt, syncing=false) {
+  const el = document.getElementById('saveStatus');
+  el.textContent = txt;
+  el.className = 'save-status' + (syncing?' syncing':'');
+  if (!syncing) setTimeout(()=>{ if(el.textContent===txt) el.textContent=''; }, 3000);
+}
+
+// ── Auth ──────────────────────────────────────────────
 document.getElementById('googleLoginBtn').addEventListener('click', () => {
+  if (!window.google) { alert('Google SDK 尚未載入，請稍後再試或使用試用模式'); return; }
   const client = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
     callback: async (resp) => {
       if (resp.error) return;
       googleAccessToken = resp.access_token;
-
-      const info = await fetch(
-        'https://www.googleapis.com/oauth2/v3/userinfo',
-        { headers:{ Authorization:'Bearer '+googleAccessToken } }
-      ).then(r=>r.json());
-
-      document.getElementById('loginScreen').style.display='none';
-      document.getElementById('app').style.display='block';
-      document.getElementById('userName').textContent =
-        `你好，${info.name}（${info.email}）`;
+      isGoogleUser = true;
+      const info = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',
+        { headers:{ Authorization:'Bearer '+resp.access_token } }).then(r=>r.json());
+      initApp(info.name || info.email, (info.name||'?')[0].toUpperCase());
+      await gDriveLoad();
+      renderAll();
     }
   });
   client.requestAccessToken();
 });
 
-document.getElementById('logoutBtn').addEventListener('click', () => {
-  google.accounts.oauth2.revoke(googleAccessToken);
-  location.reload();
+document.getElementById('demoBtn').addEventListener('click', () => {
+  isGoogleUser = false;
+  const saved = localStorage.getItem('worklog_state');
+  if (saved) try { state = JSON.parse(saved); } catch(e){}
+  initApp('示範模式', '示');
+  renderAll();
 });
-</script>
 
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  if (isGoogleUser && window.google) google.accounts.oauth2.revoke(googleAccessToken);
+  googleAccessToken = null; driveFileId = null; isGoogleUser = false;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+});
+
+function initApp(name, initial) {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('userName').textContent = name;
+  document.getElementById('userAvatar').textContent = initial;
+  activeTag = state.tags.find(t=>!t.ended) || state.tags[0] || null;
+}
+
+// ── Grid ──────────────────────────────────────────────
+function renderGrid() {
+  document.getElementById('dateLabel').textContent = fmt(currentDate);
+  const grid = document.getElementById('timeGrid');
+  grid.innerHTML = '';
+  const k = dateKey(currentDate);
+  const day = state.entries[k] || {};
+
+  for (let h = 7; h < 22; h++) {
+    const row = document.createElement('div');
+    row.className = 'hour-row';
+    const lbl = document.createElement('div');
+    lbl.className = 'hour-label';
+    lbl.textContent = h + ':00';
+    row.appendChild(lbl);
+    for (let half = 0; half < 2; half++) {
+      const sk = h + ':' + (half===0?'00':'30');
+      const slot = document.createElement('div');
+      slot.className = 'slot';
+      slot.dataset.slot = sk;
+      const filled = day[sk];
+      if (filled) {
+        const tag = state.tags.find(t=>t.name===filled);
+        slot.style.background = tag ? tag.color : '#888';
+        slot.classList.add('filled');
+        slot.textContent = filled;
+      }
+      slot.addEventListener('mousedown', e => {
+        e.preventDefault(); isDragging = true;
+        dragFill = (filled === (activeTag&&activeTag.name)) ? null : (activeTag?.name||null);
+        applySlot(k, sk, dragFill);
+      });
+      slot.addEventListener('mouseenter', () => { if(isDragging) applySlot(k, sk, dragFill); });
+      row.appendChild(slot);
+    }
+    grid.appendChild(row);
+  }
+}
+document.addEventListener('mouseup', () => { isDragging = false; dragFill = null; });
+
+function applySlot(k, sk, tagName) {
+  if (!state.entries[k]) state.entries[k] = {};
+  if (tagName) state.entries[k][sk] = tagName;
+  else delete state.entries[k][sk];
+  if (Object.keys(state.entries[k]).length === 0) delete state.entries[k];
+  scheduleSave();
+  renderGrid();
+  renderChart();
+}
+
+// ── Navigation ────────────────────────────────────────
+document.getElementById('prevDay').addEventListener('click', ()=>{ currentDate.setDate(currentDate.getDate()-1); renderGrid(); renderChart(); });
+document.getElementById('nextDay').addEventListener('click', ()=>{ currentDate.setDate(currentDate.getDate()+1); renderGrid(); renderChart(); });
+document.getElementById('todayBtn').addEventListener('click', ()=>{ currentDate=new Date(); renderGrid(); renderChart(); });
+
+// ── Tags ──────────────────────────────────────────────
+function renderTags() {
+  const container = document.getElementById('tagListContainer');
+  container.innerHTML = '';
+  const active = state.tags.filter(t=>!t.ended);
+  const ended = state.tags.filter(t=>t.ended);
+
+  function makeGroup(label, tags) {
+    if (!tags.length) return;
+    const gl = document.createElement('div');
+    gl.className = 'tag-group-label';
+    gl.textContent = label;
+    container.appendChild(gl);
+    const list = document.createElement('div');
+    list.className = 'tag-list';
+    tags.forEach(tag => {
+      const row = document.createElement('div');
+      row.className = 'tag-row' + (activeTag&&activeTag.name===tag.name?' selected':'');
+      const dot = document.createElement('div'); dot.className='tag-dot'; dot.style.background=tag.color;
+      const nm = document.createElement('span'); nm.className='tag-name'; nm.textContent=tag.name;
+      const actions = document.createElement('div'); actions.className='tag-actions';
+
+      if (!tag.ended) {
+        const endBtn = document.createElement('button'); endBtn.className='tag-action-btn'; endBtn.textContent='結束';
+        endBtn.addEventListener('click', e=>{ e.stopPropagation(); tag.ended=true; scheduleSave(); renderTags(); renderChart(); });
+        actions.appendChild(endBtn);
+      } else {
+        const st = document.createElement('span'); st.className='tag-status ended'; st.textContent='已結束';
+        const revBtn = document.createElement('button'); revBtn.className='tag-action-btn'; revBtn.textContent='恢復';
+        revBtn.addEventListener('click', e=>{ e.stopPropagation(); tag.ended=false; scheduleSave(); renderTags(); renderChart(); });
+        row.appendChild(dot); row.appendChild(nm); row.appendChild(st); row.appendChild(actions); actions.appendChild(revBtn);
+        row.addEventListener('click', ()=>{ activeTag=tag; updateActiveTagBar(); renderTags(); renderGrid(); });
+        list.appendChild(row); return;
+      }
+
+      row.appendChild(dot); row.appendChild(nm); row.appendChild(actions);
+      row.addEventListener('click', ()=>{ activeTag=tag; updateActiveTagBar(); renderTags(); renderGrid(); });
+      list.appendChild(row);
+    });
+    container.appendChild(list);
+  }
+  makeGroup('進行中專案', active);
+  makeGroup('已結束專案', ended);
+  updateActiveTagBar();
+}
+
+function updateActiveTagBar() {
+  document.getElementById('activeTagSwatch').style.background = activeTag?.color||'#ccc';
+  document.getElementById('activeTagName').textContent = activeTag?.name||'請先選擇 tag';
+}
+
+// ── Color Picker ──────────────────────────────────────
+function renderColorPicker() {
+  const cp = document.getElementById('colorPicker'); cp.innerHTML='';
+  COLORS.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'c-dot' + (c===pickedColor?' picked':'');
+    d.style.background = c;
+    d.addEventListener('click', ()=>{ pickedColor=c; renderColorPicker(); });
+    cp.appendChild(d);
+  });
+}
+
+document.getElementById('addTagBtn').addEventListener('click', ()=>{
+  const nm = document.getElementById('newTagName').value.trim();
+  if (!nm) return;
+  if (state.tags.find(t=>t.name===nm)) { alert('已有相同名稱的 tag'); return; }
+  const tag = { name:nm, color:pickedColor, ended:false };
+  state.tags.push(tag); activeTag=tag;
+  document.getElementById('newTagName').value='';
+  scheduleSave(); renderTags(); renderGrid();
+});
+
+// ── Stats ─────────────────────────────────────────────
+function getKeys() {
+  if (viewPeriod==='day') return [dateKey(currentDate)];
+  if (viewPeriod==='week') return weekDates(currentDate);
+  if (viewPeriod==='month') return monthDates(currentDate);
+  if (viewPeriod==='custom' && customStart && customEnd) return rangeDates(customStart, customEnd);
+  return [dateKey(currentDate)];
+}
+function aggregate(keys) {
+  const c={};
+  keys.forEach(k=>{ const d=state.entries[k]||{}; Object.values(d).forEach(t=>{ if(t) c[t]=(c[t]||0)+1; }); });
+  return c;
+}
+
+function renderChart() {
+  const keys = getKeys();
+  const counts = aggregate(keys);
+  const total = Object.values(counts).reduce((a,b)=>a+b,0);
+  const days = keys.length;
+
+  const sc = document.getElementById('statCards');
+  sc.innerHTML = `
+    <div class="stat-card"><div class="stat-val">${(total*0.5).toFixed(1)}h</div><div class="stat-lbl">總工時</div></div>
+    <div class="stat-card"><div class="stat-val">${days}天</div><div class="stat-lbl">統計天數</div></div>
+    <div class="stat-card"><div class="stat-val">${Object.keys(counts).length}</div><div class="stat-lbl">使用 Tag</div></div>
+    <div class="stat-card"><div class="stat-val">${days>0?(total*0.5/days).toFixed(1):0}h</div><div class="stat-lbl">日均工時</div></div>
+  `;
+
+  const leg = document.getElementById('legend');
+  if (!total) {
+    leg.innerHTML = '<div class="no-data-msg">此期間尚無紀錄</div>';
+    if(pieChartInst){pieChartInst.destroy();pieChartInst=null;}
+    const ctx=document.getElementById('pieChart').getContext('2d');
+    pieChartInst=new Chart(ctx,{type:'doughnut',data:{labels:['(無資料)'],datasets:[{data:[1],backgroundColor:['#e5e5e5'],borderWidth:0}]},options:{responsive:false,plugins:{legend:{display:false},tooltip:{enabled:false}},cutout:'60%'}});
+    return;
+  }
+
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const labels = sorted.map(e=>e[0]);
+  const values = sorted.map(e=>e[1]);
+  const bgColors = labels.map(l=>{ const t=state.tags.find(x=>x.name===l); return t?t.color:'#888'; });
+
+  const ctx=document.getElementById('pieChart').getContext('2d');
+  if(pieChartInst){pieChartInst.destroy();}
+  pieChartInst=new Chart(ctx,{
+    type:'doughnut',
+    data:{labels,datasets:[{data:values,backgroundColor:bgColors,borderWidth:3,borderColor:'#ffffff10'}]},
+    options:{responsive:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${(c.raw*0.5).toFixed(1)}h`}}},cutout:'58%',animation:{duration:400}}
+  });
+
+  leg.innerHTML='';
+  sorted.forEach(([name,cnt])=>{
+    const tag=state.tags.find(t=>t.name===name);
+    const row=document.createElement('div'); row.className='leg-row';
+    const sw=document.createElement('div'); sw.className='leg-swatch'; sw.style.background=tag?tag.color:'#888';
+    const nm=document.createElement('span'); nm.className='leg-name'; nm.textContent=name+(tag?.ended?' (已結束)':'');
+    const val=document.createElement('span'); val.className='leg-val'; val.textContent=`${(cnt*0.5).toFixed(1)}h`;
+    const pct=document.createElement('span'); pct.className='leg-pct'; pct.textContent=`${Math.round(cnt/total*100)}%`;
+    row.appendChild(sw); row.appendChild(nm); row.appendChild(val); row.appendChild(pct);
+    leg.appendChild(row);
+  });
+}
+
+// ── Period buttons ────────────────────────────────────
+document.querySelectorAll('.period-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    viewPeriod = btn.dataset.period;
+    document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById('customRange').style.display = viewPeriod==='custom'?'flex':'none';
+    renderChart();
+  });
+});
+document.getElementById('applyRange').addEventListener('click', ()=>{
+  const s=document.getElementById('rangeStart').value;
+  const e=document.getElementById('rangeEnd').value;
+  if (!s||!e) return;
+  customStart=new Date(s); customEnd=new Date(e);
+  renderChart();
+});
+
+// ── Tabs ──────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('pane-'+tab.dataset.tab).classList.add('active');
+    if(tab.dataset.tab==='stats') renderChart();
+  });
+});
+
+// ── Init ──────────────────────────────────────────────
+function renderAll() {
+  renderTags();
+  renderColorPicker();
+  renderGrid();
+  renderChart();
+}
+
+// Set today's date in custom range inputs
+const today = new Date().toISOString().slice(0,10);
+document.getElementById('rangeStart').value = today;
+document.getElementById('rangeEnd').value = today;
+</script>
 </body>
 </html>
