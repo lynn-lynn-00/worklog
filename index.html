@@ -360,7 +360,7 @@ async function gDriveSave(){
     setSaveStatus('已同步 ✓');
   }catch(e){setSaveStatus('同步失敗');localSave();}
 }
-function localSave(){localStorage.setItem('worklog_state_v2',JSON.stringify(state));setSaveStatus('已儲存 ✓');}
+function localSave(){localStorage.setItem(LS_STATE,JSON.stringify(state));setSaveStatus('已儲存 ✓');}
 function scheduleSave(){clearTimeout(saveTimeout);setSaveStatus('待儲存…');saveTimeout=setTimeout(isGoogleUser?gDriveSave:localSave,1200);}
 function setSaveStatus(txt,syncing=false){
   const el=document.getElementById('saveStatus');el.textContent=txt;
@@ -369,6 +369,60 @@ function setSaveStatus(txt,syncing=false){
 }
 
 // ── Auth ───────────────────────────────────────────────
+const LS_MODE='worklog_login_mode'; // 'google' | 'demo'
+const LS_STATE='worklog_state_v2';
+
+// On page load: restore session automatically
+(function restoreSession(){
+  const mode=localStorage.getItem(LS_MODE);
+  if(mode==='demo'){
+    // Demo mode: load local data and skip login screen
+    loadLocalState();
+    initApp('示範模式','示');
+    renderAll();
+  } else if(mode==='google'){
+    // Google mode: silently try to get a token without UX popup
+    if(!window.google){
+      // SDK not ready yet — wait for it
+      window.addEventListener('load',()=>silentGoogleRestore());
+    } else {
+      silentGoogleRestore();
+    }
+  }
+  // else: no saved mode → show login screen (first visit)
+})();
+
+function silentGoogleRestore(){
+  // Try silent token grant (prompt:'none') — works if user has active Google session
+  try{
+    const client=google.accounts.oauth2.initTokenClient({
+      client_id:CLIENT_ID,scope:SCOPES,prompt:'',
+      callback:async(resp)=>{
+        if(resp.error){
+          // Silent grant failed → show login screen so user can re-auth
+          console.log('Silent restore failed:',resp.error);
+          localStorage.removeItem(LS_MODE);
+          return;
+        }
+        googleAccessToken=resp.access_token;isGoogleUser=true;
+        const info=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+resp.access_token}}).then(r=>r.json()).catch(()=>({name:'使用者'}));
+        initApp(info.name||info.email||'使用者',(info.name||'U')[0].toUpperCase());
+        await gDriveLoad();
+        renderAll();
+      }
+    });
+    client.requestAccessToken({prompt:''});
+  }catch(e){
+    console.log('silentGoogleRestore error',e);
+    localStorage.removeItem(LS_MODE);
+  }
+}
+
+function loadLocalState(){
+  const saved=localStorage.getItem(LS_STATE);
+  if(saved)try{const d=JSON.parse(saved);if(d&&d.tags){state=d;if(!state.appName)state.appName='🌸 WorkLog';}}catch(e){}
+}
+
 document.getElementById('googleLoginBtn').addEventListener('click',()=>{
   if(!window.google){alert('Google SDK 尚未載入，請稍後再試或使用試用模式');return;}
   const client=google.accounts.oauth2.initTokenClient({
@@ -376,25 +430,30 @@ document.getElementById('googleLoginBtn').addEventListener('click',()=>{
     callback:async(resp)=>{
       if(resp.error)return;
       googleAccessToken=resp.access_token;isGoogleUser=true;
-      const info=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+resp.access_token}}).then(r=>r.json());
-      initApp(info.name||info.email,(info.name||'?')[0].toUpperCase());
+      localStorage.setItem(LS_MODE,'google');
+      const info=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+resp.access_token}}).then(r=>r.json()).catch(()=>({name:'使用者'}));
+      initApp(info.name||info.email||'使用者',(info.name||'U')[0].toUpperCase());
       await gDriveLoad();renderAll();
     }
   });
   client.requestAccessToken();
 });
+
 document.getElementById('demoBtn').addEventListener('click',()=>{
   isGoogleUser=false;
-  const saved=localStorage.getItem('worklog_state_v2');
-  if(saved)try{const d=JSON.parse(saved);if(d&&d.tags){state=d;if(!state.appName)state.appName='🌸 WorkLog';}}catch(e){}
+  localStorage.setItem(LS_MODE,'demo');
+  loadLocalState();
   initApp('示範模式','示');renderAll();
 });
+
 document.getElementById('logoutBtn').addEventListener('click',()=>{
   if(isGoogleUser&&window.google)try{google.accounts.oauth2.revoke(googleAccessToken);}catch(e){}
   googleAccessToken=null;driveFileId=null;isGoogleUser=false;
+  localStorage.removeItem(LS_MODE);
   document.getElementById('app').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
 });
+
 function initApp(name,initial){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').style.display='flex';
